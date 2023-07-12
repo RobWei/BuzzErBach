@@ -10,8 +10,8 @@
 #define UDP_PORT 4210
 
 //Button-Konfig
-#define BUZZER D1
-#define LED_STRIP D2
+#define BUZZER D6
+#define LED_STRIP D4
 
 WiFiUDP UDP;
 char packet[255];
@@ -19,6 +19,7 @@ char reply[] = "BUZZED_WHITE";
 char reply_CORRECT[] = "GREEN";
 char reply_WRONG[] = "RED";
 char reply_PAUSED[] = "PAUSED";
+char reply_RESET[] = "RESET";
 
 uint8_t con_retries = 0;
 bool standalone_mode = false;
@@ -30,26 +31,39 @@ void LED_setColor(int led, int redValue, int greenValue, int blueValue)
   pixels.show();
 }
 
+void LED_reset()
+{
+  Serial.println("Reset");
+  for (int led = 0; led <= 8; led++)
+    LED_setColor(led,1,1,1); //OFF.. mostly
+}
+
 void LED_correct()
 {
+  Serial.println("Correct");
   for (int led = 0; led <= 8; led++)
+  {
     LED_setColor(led,1,255,1); //GREEN
+  }
 }
 
 void LED_wrong()
 {
+  Serial.println("Wrong");
   for (int led = 0; led <= 8; led++)
     LED_setColor(led,255,1,1); //RED
 }
 
 void LED_buzzed()
 {
+  Serial.println("Buzzed");
   for (int led = 0; led <= 8; led++)
     LED_setColor(led,255,255,255); //WHITE
 }
 
 void LED_paused()
 {
+  Serial.println("Paused");
   for (int i = 0; i <= 10; i++)
   {
     delay(200);
@@ -58,18 +72,13 @@ void LED_paused()
   }
 }
 
-void LED_reset()
-{
-  for (int led = 0; led <= 8; led++)
-    LED_setColor(led,1,1,1); //OFF.. mostly
-}
-
 void LED_initiatlizing()
 {
+  Serial.println("INIT");
   for (int led = 0; led <= 8; led++)
   {
     LED_setColor(led,1,1,255); //BLUE
-    delay(200);
+    delay(50);
     LED_setColor(led,1,1,1); //OFF.. mostly
   }
   LED_reset();
@@ -77,35 +86,36 @@ void LED_initiatlizing()
 
 void LED_standalonemode()
 {
+  Serial.println("Standalone");
   for (int i = 0; i <= 10; i++)
   {
     for (int led = 0; led <= 8; led++)
     {
       LED_setColor(led,255,1,255); //FUCHSIA
-      delay(200);
+      delay(50);
       LED_setColor(led,1,1,1); //OFF.. mostly
     }
   }
   LED_reset();
 }
 
-
 void LED_initiatlized()
 {
+  Serial.println("IINITED");
   for (int i = 1; i <= 255; i++)
   {
     for (int led = 0; led <= 8; led++)
     {
       LED_setColor(led,i,1,1);
-      delay(10);
+      delay(1);
     }
   }
   for (int i = 1; i <= 255; i++)
   {
     for (int led = 0; led <= 8; led++)
     {
-      LED_setColor(led,255,i,1);
-      delay(10);
+      LED_setColor(led,1,i,1);
+      delay(1);
 
     }
   }
@@ -113,8 +123,8 @@ void LED_initiatlized()
   {
     for (int led = 0; led <= 8; led++)
     {
-      LED_setColor(led,255,255,i);
-      delay(10);
+      LED_setColor(led,1,1,i);
+      delay(1);
 
     }
   }
@@ -122,12 +132,12 @@ void LED_initiatlized()
 }
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
   Serial.println("BuzzerBach-Client-Node");
   pixels.begin();
   //Hardware
   pinMode(BUZZER, INPUT);
-  if (digitalRead(BUZZER) == HIGH)
+  if (digitalRead(BUZZER) == LOW)
   {
     Serial.println("Buzzer im Standalone-Mode gebootet!");
     standalone_mode = true;
@@ -152,6 +162,7 @@ void setup() {
     }
     if(WiFi.status()==WL_CONNECTED)
     {
+      LED_initiatlized();
       Serial.print("Local-Address: ");
       Serial.println(WiFi.localIP());
 
@@ -179,16 +190,18 @@ void loop() {
       }
       Serial.print("Packet received: ");
       Serial.println(packet);
-      if (packet == reply)
+      if (strstr(packet,reply))
         LED_buzzed();
-      if (packet == reply_CORRECT)
+      if (strstr(packet,reply_CORRECT))
         LED_correct();
-      if (packet == reply_WRONG)
+      if (strstr(packet,reply_WRONG))
         LED_wrong();
-      if (packet == reply_PAUSED)
+      if (strstr(packet,reply_PAUSED))
         LED_paused();
+      if (strstr(packet,reply_RESET))
+        LED_reset();
     }
-    if (digitalRead(BUZZER) == HIGH)
+    if (digitalRead(BUZZER) == LOW)
     {
       UDP.beginPacket(WiFi.gatewayIP(), UDP_PORT);
       UDP.write(reply);
@@ -197,7 +210,7 @@ void loop() {
   }
   else
   {
-    if (digitalRead(BUZZER) == HIGH)
+    if (digitalRead(BUZZER) == LOW)
     {
       buzzed_millis = millis()+(1000*10);
       LED_buzzed();

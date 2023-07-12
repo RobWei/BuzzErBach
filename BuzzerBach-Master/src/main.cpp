@@ -10,9 +10,9 @@
 
 //Button-Konfig
 #define RESET_ROUND D1
-#define PAUSE_ROUND D2
-#define CORRECT_ROUND D3
-#define WRONG_ROUND D4
+#define PAUSE_ROUND D8
+#define CORRECT_ROUND D2
+#define WRONG_ROUND D3
 
 WiFiUDP UDP;
 char packet[255];
@@ -20,9 +20,10 @@ char reply[] = "BUZZED_WHITE";
 char reply_CORRECT[] = "GREEN";
 char reply_WRONG[] = "RED";
 char reply_PAUSED[] = "PAUSED";
+char reply_RESET[] = "RESET";
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
   Serial.println("BuzzerBach-Master-Node");
   Serial.print("Initialize Soft-AP.");
   while(!WiFi.softAP(WIFI_SSID, WIFI_PASS))
@@ -48,8 +49,7 @@ void setup() {
 bool paused = false;
 int buzzed = 0;
 IPAddress buzzed_ip;
-int ids_locked[255];
-int ids_locked_index = 0;
+IPAddress buzzed_ip_dummy;
 
 void loop() {
   int packetSize = UDP.parsePacket();
@@ -61,21 +61,10 @@ void loop() {
   }
   if (packetSize && buzzed == 0) 
   {
-    bool allowed = true;
-    if(ids_locked_index != 0)
-    {
-      for(int i = 0; i < ids_locked_index; i++){
-        if(UDP.remoteIP()[3] == ids_locked[i])
-        {
-          allowed = false;
-          break;
-        }
-      }
-    }
-    if (allowed)
-    {
+
       buzzed = UDP.remoteIP()[3];
       buzzed_ip = UDP.remoteIP();
+      buzzed_ip_dummy = UDP.remoteIP();
       Serial.print("Buzzed-ID: ");
       Serial.println(buzzed); 
       Serial.print("Received packet! Size: ");
@@ -87,35 +76,42 @@ void loop() {
       }
       Serial.print("Packet received: ");
       Serial.println(packet);
-      ids_locked[ids_locked_index] = UDP.remoteIP()[3];
-      ids_locked_index++;
       UDP.beginPacket(UDP.remoteIP(), UDP_PORT);
       UDP.write(reply);
       UDP.endPacket();
-    }
+
   }
-  if (digitalRead(CORRECT_ROUND) == HIGH && buzzed != 0)
+  if (digitalRead(CORRECT_ROUND) == LOW && buzzed != 0)
   {
+    Serial.println("Correct");
     UDP.beginPacket(buzzed_ip, UDP_PORT);
     UDP.write(reply_CORRECT);
     UDP.endPacket();
-    buzzed = 0;
-    ids_locked_index = 0;
-    memset(ids_locked, 0, sizeof(ids_locked));
-  }
-  if (digitalRead(WRONG_ROUND) == HIGH && buzzed != 0)
-  {
+    delay(5000);
     UDP.beginPacket(buzzed_ip, UDP_PORT);
-    UDP.write(reply_WRONG);
+    UDP.write(reply_RESET);
     UDP.endPacket();
     buzzed = 0;
   }
-  if (digitalRead(RESET_ROUND) == HIGH)
+  if (digitalRead(WRONG_ROUND) == LOW && buzzed != 0)
   {
+    Serial.println("Wrong");
+    UDP.beginPacket(buzzed_ip, UDP_PORT);
+    UDP.write(reply_WRONG);
+    UDP.endPacket();
+    delay(5000);
+    UDP.beginPacket(buzzed_ip, UDP_PORT);
+    UDP.write(reply_RESET);
+    UDP.endPacket();
     buzzed = 0;
-    ids_locked_index = 0;
-    memset(ids_locked, 0, sizeof(ids_locked));
   }
-  if (digitalRead(PAUSE_ROUND) == HIGH)
-    paused = !paused;
+  if (digitalRead(RESET_ROUND) == LOW)
+  {
+    Serial.println("RESET");
+    UDP.beginPacket(buzzed_ip, UDP_PORT);
+    UDP.write(reply_RESET);
+    UDP.endPacket();
+    buzzed = 0;
+    delay(1000);
+  }
 }
